@@ -28,6 +28,8 @@ import (
 	"sync/atomic"
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 // Generic Netlink Client
@@ -83,6 +85,13 @@ func NewNetlinkClient(proto int, groups uint32, readBuf []byte, resp io.Writer) 
 	}
 
 	src := &syscall.SockaddrNetlink{Family: syscall.AF_NETLINK, Groups: groups}
+	// since linux kernel version 4.2 set NETLINK_LISTEN_ALL_NSID
+	// to receive notifications across all namespaces
+	if err = syscall.SetSockoptInt(s, unix.SOL_NETLINK, unix.NETLINK_LISTEN_ALL_NSID, 1); err != nil {
+		syscall.Close(s)
+		return nil, fmt.Errorf("setsockopt failed: %w", err)
+	}
+
 	if err = syscall.Bind(s, src); err != nil {
 		syscall.Close(s)
 		return nil, fmt.Errorf("bind failed: %w", err)
